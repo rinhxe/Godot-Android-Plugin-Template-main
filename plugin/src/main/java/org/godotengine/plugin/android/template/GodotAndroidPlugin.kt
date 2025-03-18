@@ -1,6 +1,6 @@
 // TODO: Update to match your plugin's package name.
 package org.godotengine.plugin.android.template
-
+import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.ContentValues
 import android.content.Intent
@@ -40,50 +40,85 @@ class GodotAndroidPlugin(godot: Godot): GodotPlugin(godot) {
             openFolder()
         }
     }
+
+    @UsedByGodot
+    fun showAlert(title: String, message: String) {
+        runOnUiThread {
+            val builder = AlertDialog.Builder(activity)
+            builder.setTitle(title)
+            builder.setMessage(message)
+            builder.setPositiveButton("Okie") { dialog, _ ->
+                dialog.dismiss()
+            }
+            // Optional: Add a negative button
+            // builder.setNegativeButton("Cancel") { dialog, _ ->
+            //     dialog.dismiss()
+            // }
+            val dialog = builder.create()
+            dialog.show()
+        }
+    }
+
+
     private fun saveFolder(){
         try {
             val folder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Tempo-Rally")
-            Toast.makeText(activity, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).toString(), Toast.LENGTH_SHORT).show()
+//            Toast.makeText(activity, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).toString(), Toast.LENGTH_SHORT).show()
 
-
-            if (!folder.exists()) {
-                if (folder.mkdirs()) {
-                    Toast.makeText(activity, "Folder created successfully", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(activity, "Failed to create folder", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                // Toast.makeText(activity, "Folder already exists", Toast.LENGTH_SHORT).show()
+            if (folder.exists()) {
+                return
             }
-        }catch (e : Exception){
-            Toast.makeText(activity,e.message , Toast.LENGTH_LONG).show()
 
+            if (!folder.mkdirs()) {
+                showAlert("Cannot open Custom Levels folder", "Unable to create " + folder.absolutePath)
+            }
+
+        }catch (e : Exception){
+            showAlert("Error creating Customs Level folder", e.message ?: "Unknown error")
         }
 
+    }
+
+    fun openFolderSamsung(folder: File) {
+        try { // New samsung version
+            _openFolderSamsung(folder, "com.sec.android.app.myfiles.ui.MainActivity")
+        } catch (e: Exception) {
+            _openFolderSamsung(folder, "com.sec.android.app.myfiles.external.ui.MainActivity")
+        }
+    }
+
+    fun _openFolderSamsung(folder: File, mainActivity: String) {
+        val intent = Intent(Intent.ACTION_VIEW)
+        val uri = Uri.parse(folder.absolutePath)
+        intent.setClassName("com.sec.android.app.myfiles", mainActivity)
+        intent.setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR) // Mở thư mục bằng ứng dụng quản lý file
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity?.startActivity(intent)
+        //Toast.makeText(activity, "Open Samsung Files", Toast.LENGTH_SHORT).show()
     }
 
     private fun openFolder() {
         try {
             val folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).resolve("Tempo-Rally")
-            if (folder.exists()) {
+            if (!folder.exists()) {
+                showAlert("Cannot open Custom Levels folder", "Unable to create " + folder.absolutePath)
+                return
+            }
+
+            // Check if the device is Samsung
+            if ("samsung" in Build.MANUFACTURER.lowercase()) {
+                openFolderSamsung(folder)
+            } else {
                 val uri = Uri.parse(folder.absolutePath)
                 val intent = Intent(Intent.ACTION_VIEW)
-
-                // Check if the device is Samsung
-                if ("samsung" in Build.MANUFACTURER.lowercase()) {
-                    intent.setClassName("com.sec.android.app.myfiles", "com.sec.android.app.myfiles.external.ui.MainActivity")
-                    Toast.makeText(activity, "Open Samsung Files", Toast.LENGTH_SHORT).show()
-                }
-
                 intent.setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR) // Mở thư mục bằng ứng dụng quản lý file
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 activity?.startActivity(intent)
-            } else {
-                Toast.makeText(activity, "Folder does not exist", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(activity, e.message, Toast.LENGTH_LONG).show()
+            showAlert("Error", e.message ?: "Unknown error")
         }
     }
 }
